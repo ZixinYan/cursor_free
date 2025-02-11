@@ -13,8 +13,8 @@ python cursor_register.py
 <p>而且还有就是这个Chrome浏览器启动速度有点儿慢,需要30s左右，但是我也不知道为啥</p>
 
 # 项目思路
-- **网络请求**
-采用curl_cffi库进行HRTTP请求，这个比requests处理反爬更加稳定，可以绕过一些User-Agent检测
+- ***网络请求***
+  <p>采用curl_cffi库进行HRTTP请求，这个比requests处理反爬更加稳定，可以绕过一些User-Agent检测</p>
 - ***自动化浏览器操作***
   <p>采用Selenium模拟用户交互，实现了点击按钮，输入文本，滚动页面等</p>
   <p>模拟人类真实的输入，制造输入停顿，鼠标移动等动作</p>
