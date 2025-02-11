@@ -1,5 +1,5 @@
 # 脚本使用方法
-- 注册2925无限邮，然后进入脚本修改为自己的邮箱前缀
+- 注册2925无限邮，然后进入cursor_register.py脚本修改为自己的邮箱前缀
 - 执行注册脚本
 ```bash
 python cursor_register.py
