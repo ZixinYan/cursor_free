@@ -19,7 +19,7 @@ python cursor_register.py
   <p>采用Selenium模拟用户交互，实现了点击按钮，输入文本，滚动页面等</p>
   <p>模拟人类真实的输入，制造输入停顿，鼠标移动等动作</p>
 - ***账号密码生成***
-  采用随机数生成，比较自动
+  <p>采用随机数生成，比较自动</p>
 - ***反爬***
   <p>采用undetected_chromedriver尝试规避网站的Selenium检测</p>
   <p>尝试JavaScript（stealth.min.js）隐藏webdriver进行反检测</p>
