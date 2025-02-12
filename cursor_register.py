@@ -8,6 +8,7 @@ import sys
 import random
 import string
 import os
+import re
 
 # ========================
 # 全局配置
@@ -30,56 +31,89 @@ def simulate_human_input(element, text):
         element.send_keys(char)
         time.sleep(random.uniform(0.1, 0.3))
 
-def open_email_website():
-    print("Starting browser...")
-    driver2 = None
+def get_chrome_options():
+    options = uc.ChromeOptions()
+    options.add_argument('--no-sandbox')
+    options.add_argument('--disable-dev-shm-usage')
+    options.add_argument('--disable-extensions')
+    options.add_argument('--disable-blink-features=AutomationControlled')
+    options.add_argument('--disable-plugins-discovery')
+    options.add_argument('--mute-audio')
+    options.add_argument('--no-service-autorun')
+    user_data_dir = os.path.join(os.getcwd(), 'chrome_profile')
+    options.add_argument(f'--user-data-dir={user_data_dir}')
+    options.add_argument('--disable-background-networking')
+    options.add_argument('--disable-client-side-phishing-detection')
+    
+    return options
+
+def get_latest_verification_code(driver):
     try:
-        options = uc.ChromeOptions()
-        options.add_argument('--no-sandbox')
-        options.add_argument('--disable-dev-shm-usage')
-        options.add_argument('--disable-gpu')
-        options.add_argument('--disable-extensions')
-        options.add_argument('--disable-software-rasterizer')
-        options.add_argument('--ignore-certificate-errors')
-        options.add_argument('--disable-setuid-sandbox')
-        options.add_argument('--no-first-run')
-        options.add_argument('--no-default-browser-check')
-        options.add_argument('--disable-infobars')
-        options.add_argument('--start-maximized')
-        options.add_argument('--disable-blink-features=AutomationControlled')
-        driver2 = uc.Chrome(options=options, use_subprocess=True)
-        with open('stealth.min.js', 'r') as f:
-            stealth_js = f.read()
-        driver2.execute_cdp_cmd('Page.addScriptToEvaluateOnNewDocument', {
-            'source': stealth_js
-        })
-        driver2.get("https://www.2925.com/#/")
-        time.sleep(5)
-        print("Logging into email...")
-        try:
-            username_input = WebDriverWait(driver2, 10).until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, ".el-input__inner[type='text']"))
-            )
-            simulate_human_input(username_input, EMAIL_PREFIX)
-            time.sleep(1)
+        print("Waiting for email to load...")
+        # Wait for the first email to be clickable
+        first_email = WebDriverWait(driver, 15).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, ".el-table__row"))
+        )
+        first_email.click()    
+        email_content = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, ".mail-content"))
+        )
+        content_text = email_content.text
+        verification_code = re.search(r'\b\d{6}\b', content_text)
+        
+        if verification_code:
+            code = verification_code.group(0)
+            print(f"Found verification code: {code}")
+            return code
+        else:
+            print("Verification code not found in email")
+            return None
             
-            password_input = driver2.find_element(By.CSS_SELECTOR, ".el-input__inner[type='password']")
-            simulate_human_input(password_input, EMAIL_PASSWORD)
-            time.sleep(1)
-            
-            login_button = WebDriverWait(driver2, 10).until(
-                EC.element_to_be_clickable((By.CSS_SELECTOR, ".el-button--primary"))
-            )
-            driver2.execute_script("arguments[0].click();", login_button)
-            print("\nPlease check verification code manually...")
-            input("Press Enter to close email window...") 
-        finally:
-            if driver2:
-                driver2.quit()      
     except Exception as e:
-        print(f"Email operation failed: {str(e)}")
-        if driver2:
-            driver2.quit()
+        print(f"Error getting verification code: {str(e)}")
+        return None
+
+def login_email(driver):
+    try:
+        print("Logging into email...")
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, ".el-input__inner[type='text']"))
+        )
+        username_input = driver.find_element(By.CSS_SELECTOR, ".el-input__inner[type='text']")
+        simulate_human_input(username_input, EMAIL_PREFIX)
+        password_input = driver.find_element(By.CSS_SELECTOR, ".el-input__inner[type='password']")
+        simulate_human_input(password_input, EMAIL_PASSWORD)
+        login_button = WebDriverWait(driver, 10).until(
+            EC.element_to_be_clickable((By.CSS_SELECTOR, ".el-button--primary"))
+        )
+        driver.execute_script("arguments[0].click();", login_button)
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, ".el-table__row"))
+        )
+        print("Email login successful")
+        return True
+        
+    except Exception as e:
+        print(f"Email login failed: {str(e)}")
+        return False
+
+def switch_to_new_tab(driver, url):
+    try:
+        original_window = driver.current_window_handle
+        print(f"Opening new tab: {url}")
+        driver.execute_script(f"window.open('{url}', '_blank');")
+        WebDriverWait(driver, 10).until(lambda d: len(d.window_handles) > 1)
+        for window_handle in driver.window_handles:
+            if window_handle != original_window:
+                driver.switch_to.window(window_handle)
+                break
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.TAG_NAME, "body"))
+        )
+        return True
+    except Exception as e:
+        print(f"Error switching to new tab: {str(e)}")
+        return False
 
 def register_account():
     first_name = generate_random_string()
@@ -89,96 +123,96 @@ def register_account():
     email = f"{EMAIL_PREFIX}{email_suffix}@2925.com"
     password = generate_password()
     print(f"Using email: {email}")
-    print("Starting browser...")
-    options = uc.ChromeOptions()
-    
-    # 只保留核心配置
-    options.add_argument('--no-sandbox')
-    options.add_argument('--disable-dev-shm-usage')
-    options.add_argument('--disable-gpu')
-    options.add_argument('--disable-extensions')
-    options.add_argument('--disable-software-rasterizer')
-    options.add_argument('--disable-plugins')
-    options.add_argument('--disable-cache')
-    options.add_argument('--disk-cache-size=1')
-    
+    print("Starting browser...")  
+    options = get_chrome_options()
+    driver = None
     try:
         driver = uc.Chrome(options=options, use_subprocess=True)
         
-        # 注入 stealth.js
         with open('stealth.min.js', 'r') as f:
             stealth_js = f.read()
         driver.execute_cdp_cmd('Page.addScriptToEvaluateOnNewDocument', {
             'source': stealth_js
         })
+        driver.execute_cdp_cmd('Network.enable', {})
+        driver.execute_cdp_cmd('Network.setCacheDisabled', {'cacheDisabled': False})       
+        print("Accessing login page...")
+        driver.get("https://authenticator.cursor.sh/sign-up")
+        WebDriverWait(driver, 30).until(
+            EC.presence_of_element_located((By.TAG_NAME, 'body'))
+        )
+        print("Filling registration information...")
+        firstname_input = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "input[autocomplete='given-name']"))
+        )
+        simulate_human_input(firstname_input, first_name) 
+        lastname_input = driver.find_element(By.CSS_SELECTOR, "input[autocomplete='family-name']")
+        simulate_human_input(lastname_input, last_name)
         
-        try:
-            print("Accessing login page...")
-            driver.get("https://authenticator.cursor.sh/?client_id=client_01GS6W3C96KW4WRS6Z93JCE2RJ&redirect_uri=https%3A%2F%2Fcursor.com%2Fapi%2Fauth%2Fcallback&response_type=code&state=%257B%2522returnTo%2522%253A%2522%252Fsettings%2522%257D")
-            time.sleep(8) 
+        email_input = driver.find_element(By.CSS_SELECTOR, "input[type='email']")
+        simulate_human_input(email_input, email)
         
-            print("Entering registration...")
+        continue_button = driver.find_element(By.CSS_SELECTOR, "button[name='intent'][value='sign-up']")
+        continue_button.click()
+        
+        print("\nPlease complete human verification...")
+        input("Press Enter to continue after verification...")
+        
+        print("Entering password...")
+        password_input = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='password']"))
+        )
+        simulate_human_input(password_input, password)
+        
+        next_button = driver.find_element(By.CSS_SELECTOR, "button[type='submit']")
+        next_button.click()
+        
+        print("\nPlease complete second human verification...")
+        input("Press Enter to continue after verification...")
+        
+        # Open email in new tab
+        if not switch_to_new_tab(driver, 'https://www.2925.com/#/mailList'):
+            print("Failed to open email in new tab. Retrying...")
             try:
-                driver.get("https://authenticator.cursor.sh/sign-up")   
+                driver.get('https://www.2925.com/#/mailList')
             except Exception as e:
-                print(f"Failed to enter registration: {str(e)}")
-                time.sleep(5)
-            print("Filling registration information...")
-            firstname_input = WebDriverWait(driver, 10).until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, "input[autocomplete='given-name']"))
-            )
-            simulate_human_input(firstname_input, first_name)
-            
-            lastname_input = driver.find_element(By.CSS_SELECTOR, "input[autocomplete='family-name']")
-            simulate_human_input(lastname_input, last_name)
-            
-            email_input = driver.find_element(By.CSS_SELECTOR, "input[type='email']")
-            simulate_human_input(email_input, email)
-            continue_button = driver.find_element(By.CSS_SELECTOR, "button[name='intent'][value='sign-up']")
-            continue_button.click()
-            print("\nPlease complete human verification...")
-            print("Press Enter to continue after verification...")
-            input()
-            print("Entering password...")
-            password_input = WebDriverWait(driver, 10).until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='password']"))
-            )
-            simulate_human_input(password_input, password)
-            next_button = driver.find_element(By.CSS_SELECTOR, "button[type='submit']")
-            next_button.click()
-            
-            print("\nPlease complete second human verification...")
-            print("Press Enter to continue after verification...")
-            input()
-            open_email_website()
-            print("\nPlease complete final human verification...")
-            print("Press Enter to continue after verification...")
-            input()
-            account_info = {
-                "email": email,
-                "password": password
-            }
-            
-            with open("cursor_account.json", "w") as f:
-                json.dump(account_info, f, indent=2)
-            print("Account information saved to cursor_account.json")
-            config_path = os.path.join(os.getenv("APPDATA"), "Cursor", "config.json")
-            if os.path.exists(config_path):
-                os.remove(config_path)
-            with open(config_path, "w") as f:
-                json.dump(account_info, f, indent=2)
-            print("Cursor configuration updated")
-            
-            print("\nRegistration complete, press Enter to close browser...")
-            input()
-            
-        finally:
-            if driver:
-                driver.quit()
-                
-    except Exception as e:
-        print(f"Error during registration: {str(e)}")
-        raise
+                print(f"Failed to access email website: {str(e)}")
+                print("Please open email website manually...")
+                input("Press Enter after opening email website...")
+        
+        # Try to login to email
+        if not login_email(driver):
+            print("Failed to login to email. Please login manually...")
+            input("Press Enter after logging in...")
+        
+        print("\nPlease check verification code and complete verification manually...")
+        input("Press Enter after verification is complete...")
+        
+        # Switch back to registration tab
+        driver.switch_to.window(driver.window_handles[0])
+        
+        account_info = {
+            "email": email,
+            "password": password
+        }
+        
+        with open("cursor_account.json", "w") as f:
+            json.dump(account_info, f, indent=2)
+        print("Account information saved to cursor_account.json")
+        
+        config_path = os.path.join(os.getenv("APPDATA"), "Cursor", "config.json")
+        if os.path.exists(config_path):
+            os.remove(config_path)
+        with open(config_path, "w") as f:
+            json.dump(account_info, f, indent=2)
+        print("Cursor configuration updated")
+        
+        print("\nRegistration complete, press Enter to close browser...")
+        input()
+        
+    finally:
+        if driver:
+            driver.quit()
 
 def main():
     try:
