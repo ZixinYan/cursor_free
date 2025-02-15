@@ -346,8 +346,6 @@ def register_account():
         print("\nStarting Cloudflare verification...")
         if not handle_cloudflare_verification(driver):
             print("Cloudflare bypass failed after all attempts")
-            print("Current page title:", driver.title)
-            driver.get_screenshot('verification_failed.png')
             response = input("验证失败。是否需要更新点击位置？(y/n): ")
             if response.lower() == 'y':
                 click_positions = {
@@ -365,7 +363,6 @@ def register_account():
         except:
             print("Password input not found after timeout")
             print("Current page title:", driver.title)
-            driver.get_screenshot('password_input_missing.png')
             input("Please check if the page has loaded correctly and press Enter to continue...")
         
         print("Entering password...")
